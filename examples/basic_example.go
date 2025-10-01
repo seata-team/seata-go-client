@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/dtm-labs/seata-go-client"
+	"github.com/seata-team/seata-go-client"
 )
 
 func basicExample() {

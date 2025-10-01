@@ -15,7 +15,7 @@ A comprehensive Go client library for the Seata distributed transaction coordina
 ## 📦 Installation
 
 ```bash
-go get github.com/dtm-labs/seata-go-client
+go get github.com/seata-team/seata-go-client
 ```
 
 ## 🔧 Quick Start
@@ -28,7 +28,7 @@ package main
 import (
     "context"
     "log"
-    "github.com/dtm-labs/seata-go-client"
+    "github.com/seata-team/seata-go-client"
 )
 
 func main() {
@@ -376,7 +376,7 @@ if err != nil {
 
 ```bash
 # Clone repository
-git clone https://github.com/dtm-labs/seata-go-client.git
+git clone https://github.com/seata-team/seata-go-client.git
 cd seata-go-client
 
 # Install dependencies
@@ -410,8 +410,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 - **Documentation**: [API Reference](README.md)
-- **Issues**: [GitHub Issues](https://github.com/dtm-labs/seata-go-client/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/dtm-labs/seata-go-client/discussions)
+- **Issues**: [GitHub Issues](https://github.com/seata-team/seata-go-client/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/seata-team/seata-go-client/discussions)
 
 ---
 

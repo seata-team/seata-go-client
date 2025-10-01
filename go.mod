@@ -1,4 +1,4 @@
-module github.com/dtm-labs/seata-go-client
+module github.com/seata-team/seata-go-client
 
 go 1.21
 
