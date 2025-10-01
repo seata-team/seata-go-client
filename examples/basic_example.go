@@ -36,17 +36,17 @@ func basicExample() {
 
 	// Add branches to the transaction
 	fmt.Println("Adding branches...")
-	err = tx.AddBranch(ctx, "order-service", "http://order-service:8080/api/orders")
+	err = tx.AddBranch(ctx, "order-service", "http://127.0.0.1:18080/ok")
 	if err != nil {
 		log.Fatalf("Failed to add order branch: %v", err)
 	}
 
-	err = tx.AddBranch(ctx, "payment-service", "http://payment-service:8080/api/payments")
+	err = tx.AddBranch(ctx, "payment-service", "http://127.0.0.1:18080/ok")
 	if err != nil {
 		log.Fatalf("Failed to add payment branch: %v", err)
 	}
 
-	err = tx.AddBranch(ctx, "inventory-service", "http://inventory-service:8080/api/inventory")
+	err = tx.AddBranch(ctx, "inventory-service", "http://127.0.0.1:18080/ok")
 	if err != nil {
 		log.Fatalf("Failed to add inventory branch: %v", err)
 	}

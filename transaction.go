@@ -35,6 +35,16 @@ type TransactionInfo struct {
 
 // AddBranch adds a branch transaction to the global transaction
 func (tx *Transaction) AddBranch(ctx context.Context, branchID, action string) error {
+	// Use gRPC if available, otherwise fall back to HTTP
+	if tx.client.grpcClient != nil && tx.client.grpcClient.client != nil {
+		return tx.addBranchGRPC(ctx, branchID, action)
+	}
+
+	return tx.addBranchHTTP(ctx, branchID, action)
+}
+
+// addBranchHTTP adds a branch via HTTP
+func (tx *Transaction) addBranchHTTP(ctx context.Context, branchID, action string) error {
 	req := map[string]interface{}{
 		"gid":       tx.gid,
 		"branch_id": branchID,
@@ -64,8 +74,34 @@ func (tx *Transaction) AddBranch(ctx context.Context, branchID, action string) e
 	return nil
 }
 
+// addBranchGRPC adds a branch via gRPC
+func (tx *Transaction) addBranchGRPC(ctx context.Context, branchID, action string) error {
+	_, err := tx.client.grpcClient.AddBranch(ctx, tx.gid, branchID, action)
+	if err != nil {
+		return fmt.Errorf("failed to add branch via gRPC: %w", err)
+	}
+
+	// Add branch to local list
+	tx.branches = append(tx.branches, &Branch{
+		BranchID: branchID,
+		Action:   action,
+	})
+
+	return nil
+}
+
 // Submit submits the global transaction for execution
 func (tx *Transaction) Submit(ctx context.Context) error {
+	// Use gRPC if available, otherwise fall back to HTTP
+	if tx.client.grpcClient != nil && tx.client.grpcClient.client != nil {
+		return tx.submitGRPC(ctx)
+	}
+
+	return tx.submitHTTP(ctx)
+}
+
+// submitHTTP submits a transaction via HTTP
+func (tx *Transaction) submitHTTP(ctx context.Context) error {
 	req := map[string]interface{}{
 		"gid": tx.gid,
 	}
@@ -82,6 +118,16 @@ func (tx *Transaction) Submit(ctx context.Context) error {
 
 	if resp.StatusCode() != 200 {
 		return fmt.Errorf("failed to submit transaction: status %d, body: %s", resp.StatusCode(), resp.String())
+	}
+
+	return nil
+}
+
+// submitGRPC submits a transaction via gRPC
+func (tx *Transaction) submitGRPC(ctx context.Context) error {
+	_, err := tx.client.grpcClient.Submit(ctx, tx.gid)
+	if err != nil {
+		return fmt.Errorf("failed to submit transaction via gRPC: %w", err)
 	}
 
 	return nil
@@ -166,7 +212,7 @@ func (tx *Transaction) Confirm(ctx context.Context, branchID string) error {
 		SetContext(ctx).
 		SetHeader("Content-Type", "application/json").
 		SetBody(req).
-		Post("/api/branch/confirm")
+		Post("/api/branch/succeed")
 
 	if err != nil {
 		return fmt.Errorf("failed to execute confirm phase: %w", err)
@@ -190,7 +236,7 @@ func (tx *Transaction) Cancel(ctx context.Context, branchID string) error {
 		SetContext(ctx).
 		SetHeader("Content-Type", "application/json").
 		SetBody(req).
-		Post("/api/branch/cancel")
+		Post("/api/branch/fail")
 
 	if err != nil {
 		return fmt.Errorf("failed to execute cancel phase: %w", err)

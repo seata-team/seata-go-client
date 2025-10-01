@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.21
+    
+    - name: Run tests
+      run: go test ./...
+    
+    - name: Build
+      run: go build -v ./...
+    
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+        body: |
+          ## Changes
+          
+          See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+          
+          ## Installation
+          
+          ```bash
+          go get github.com/seata-team/seata-go-client@${{ github.ref_name }}
+          ```
+          
+          ## Usage
+          
+          ```go
+          import "github.com/seata-team/seata-go-client"
+          
+          client := seata.NewClientWithDefaults()
+          defer client.Close()
+          ```
+
+  build-binaries:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.21
+    
+    - name: Build
+      run: |
+        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o seata-go-client-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }} ./examples/main.go
+    
+    - name: Upload binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: seata-go-client-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: seata-go-client-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.exe' || '' }}

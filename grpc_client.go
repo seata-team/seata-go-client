@@ -2,9 +2,12 @@ package seata
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	seata_proto "github.com/seata-team/seata-go-client/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -12,130 +15,17 @@ import (
 // GrpcClient represents a gRPC client for Seata server
 type GrpcClient struct {
 	conn   *grpc.ClientConn
-	client TransactionServiceClient
+	client seata_proto.TransactionServiceClient
 }
 
 // NewGrpcClient creates a new gRPC client
 func NewGrpcClient(endpoint string) *GrpcClient {
-	// Note: This is a placeholder. In a real implementation, you would:
-	// 1. Generate Go code from the .proto files
-	// 2. Use the generated client code
-	// 3. Implement proper connection management
-
-	return &GrpcClient{}
-}
-
-// TransactionServiceClient is a placeholder for the generated gRPC client
-type TransactionServiceClient interface {
-	StartGlobal(ctx context.Context, req *StartGlobalRequest) (*StartGlobalResponse, error)
-	Submit(ctx context.Context, req *SubmitRequest) (*SubmitResponse, error)
-	Abort(ctx context.Context, req *AbortRequest) (*AbortResponse, error)
-	AddBranch(ctx context.Context, req *AddBranchRequest) (*AddBranchResponse, error)
-	BranchTry(ctx context.Context, req *BranchTryRequest) (*BranchTryResponse, error)
-	BranchSucceed(ctx context.Context, req *BranchSucceedRequest) (*BranchSucceedResponse, error)
-	BranchFail(ctx context.Context, req *BranchFailRequest) (*BranchFailResponse, error)
-	Get(ctx context.Context, req *GetRequest) (*GetResponse, error)
-	List(ctx context.Context, req *ListRequest) (*ListResponse, error)
-}
-
-// gRPC Request/Response types (placeholders)
-type StartGlobalRequest struct {
-	GID     string
-	Mode    string
-	Payload []byte
-}
-
-type StartGlobalResponse struct {
-	GID string
-}
-
-type SubmitRequest struct {
-	GID string
-}
-
-type SubmitResponse struct {
-	Status string
-}
-
-type AbortRequest struct {
-	GID string
-}
-
-type AbortResponse struct {
-	Status string
-}
-
-type AddBranchRequest struct {
-	GID      string
-	BranchID string
-	Action   string
-}
-
-type AddBranchResponse struct {
-	Status string
-}
-
-type BranchTryRequest struct {
-	GID      string
-	BranchID string
-	Action   string
-	Payload  []byte
-}
-
-type BranchTryResponse struct {
-	Status string
-}
-
-type BranchSucceedRequest struct {
-	GID      string
-	BranchID string
-}
-
-type BranchSucceedResponse struct {
-	Status string
-}
-
-type BranchFailRequest struct {
-	GID      string
-	BranchID string
-}
-
-type BranchFailResponse struct {
-	Status string
-}
-
-type GetRequest struct {
-	GID string
-}
-
-type GetResponse struct {
-	Transaction *GlobalTxn
-}
-
-type ListRequest struct {
-	Limit  int32
-	Offset int32
-	Status string
-}
-
-type ListResponse struct {
-	Transactions []*GlobalTxn
-}
-
-type GlobalTxn struct {
-	GID         string
-	Mode        string
-	Status      string
-	Payload     []byte
-	Branches    []*BranchTxn
-	UpdatedUnix int64
-	CreatedUnix int64
-}
-
-type BranchTxn struct {
-	BranchID string
-	Action   string
-	Status   string
+	client := &GrpcClient{}
+	if err := client.Connect(endpoint); err != nil {
+		// Log error but don't fail - connection will be established on first use
+		fmt.Printf("Warning: Failed to connect to gRPC server: %v\n", err)
+	}
+	return client
 }
 
 // Connect establishes a connection to the gRPC server
@@ -143,13 +33,21 @@ func (gc *GrpcClient) Connect(endpoint string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	target := endpoint
+	if strings.HasPrefix(target, "grpc://") {
+		target = strings.TrimPrefix(target, "grpc://")
+	}
+	if target == "" {
+		return fmt.Errorf("invalid gRPC endpoint")
+	}
+
+	conn, err := grpc.DialContext(ctx, target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("failed to connect to gRPC server: %w", err)
 	}
 
 	gc.conn = conn
-	// gc.client = NewTransactionServiceClient(conn) // This would be generated from proto files
+	gc.client = seata_proto.NewTransactionServiceClient(conn)
 
 	return nil
 }
@@ -163,138 +61,154 @@ func (gc *GrpcClient) Close() error {
 }
 
 // StartGlobal starts a global transaction via gRPC
-func (gc *GrpcClient) StartGlobal(ctx context.Context, req *StartGlobalRequest) (*StartGlobalResponse, error) {
+func (gc *GrpcClient) StartGlobal(ctx context.Context, gid, mode string, payload []byte) (*seata_proto.StartGlobalResponse, error) {
 	if gc.client == nil {
 		return nil, fmt.Errorf("gRPC client not connected")
 	}
 
-	// This would use the actual generated client
-	// return gc.client.StartGlobal(ctx, req)
+	req := &seata_proto.StartGlobalRequest{
+		Gid:     gid,
+		Mode:    mode,
+		Payload: payload,
+	}
 
-	// Placeholder implementation
-	return &StartGlobalResponse{
-		GID: req.GID,
-	}, nil
+	return gc.client.StartGlobal(ctx, req)
 }
 
 // Submit submits a transaction via gRPC
-func (gc *GrpcClient) Submit(ctx context.Context, req *SubmitRequest) (*SubmitResponse, error) {
+func (gc *GrpcClient) Submit(ctx context.Context, gid string) (*seata_proto.SubmitResponse, error) {
 	if gc.client == nil {
 		return nil, fmt.Errorf("gRPC client not connected")
 	}
 
-	// This would use the actual generated client
-	// return gc.client.Submit(ctx, req)
+	req := &seata_proto.SubmitRequest{
+		Gid: gid,
+	}
 
-	// Placeholder implementation
-	return &SubmitResponse{
-		Status: "success",
-	}, nil
+	return gc.client.Submit(ctx, req)
 }
 
 // Abort aborts a transaction via gRPC
-func (gc *GrpcClient) Abort(ctx context.Context, req *AbortRequest) (*AbortResponse, error) {
+func (gc *GrpcClient) Abort(ctx context.Context, gid string) (*seata_proto.AbortResponse, error) {
 	if gc.client == nil {
 		return nil, fmt.Errorf("gRPC client not connected")
 	}
 
-	// This would use the actual generated client
-	// return gc.client.Abort(ctx, req)
+	req := &seata_proto.AbortRequest{
+		Gid: gid,
+	}
 
-	// Placeholder implementation
-	return &AbortResponse{
-		Status: "success",
-	}, nil
+	return gc.client.Abort(ctx, req)
 }
 
 // AddBranch adds a branch via gRPC
-func (gc *GrpcClient) AddBranch(ctx context.Context, req *AddBranchRequest) (*AddBranchResponse, error) {
+func (gc *GrpcClient) AddBranch(ctx context.Context, gid, branchID, action string) (*seata_proto.AddBranchResponse, error) {
 	if gc.client == nil {
 		return nil, fmt.Errorf("gRPC client not connected")
 	}
 
-	// This would use the actual generated client
-	// return gc.client.AddBranch(ctx, req)
+	req := &seata_proto.AddBranchRequest{
+		Gid:      gid,
+		BranchId: branchID,
+		Action:   action,
+	}
 
-	// Placeholder implementation
-	return &AddBranchResponse{
-		Status: "success",
-	}, nil
+	return gc.client.AddBranch(ctx, req)
 }
 
 // BranchTry executes try phase via gRPC
-func (gc *GrpcClient) BranchTry(ctx context.Context, req *BranchTryRequest) (*BranchTryResponse, error) {
+func (gc *GrpcClient) BranchTry(ctx context.Context, gid, branchID, action string) (*seata_proto.BranchTryResponse, error) {
 	if gc.client == nil {
 		return nil, fmt.Errorf("gRPC client not connected")
 	}
 
-	// This would use the actual generated client
-	// return gc.client.BranchTry(ctx, req)
+	req := &seata_proto.BranchTryRequest{
+		Gid:      gid,
+		BranchId: branchID,
+		Action:   action,
+	}
 
-	// Placeholder implementation
-	return &BranchTryResponse{
-		Status: "success",
-	}, nil
+	return gc.client.BranchTry(ctx, req)
 }
 
 // BranchSucceed marks branch as successful via gRPC
-func (gc *GrpcClient) BranchSucceed(ctx context.Context, req *BranchSucceedRequest) (*BranchSucceedResponse, error) {
+func (gc *GrpcClient) BranchSucceed(ctx context.Context, gid, branchID string) (*seata_proto.BranchStateResponse, error) {
 	if gc.client == nil {
 		return nil, fmt.Errorf("gRPC client not connected")
 	}
 
-	// This would use the actual generated client
-	// return gc.client.BranchSucceed(ctx, req)
+	req := &seata_proto.BranchStateRequest{
+		Gid:      gid,
+		BranchId: branchID,
+	}
 
-	// Placeholder implementation
-	return &BranchSucceedResponse{
-		Status: "success",
-	}, nil
+	return gc.client.BranchSucceed(ctx, req)
 }
 
 // BranchFail marks branch as failed via gRPC
-func (gc *GrpcClient) BranchFail(ctx context.Context, req *BranchFailRequest) (*BranchFailResponse, error) {
+func (gc *GrpcClient) BranchFail(ctx context.Context, gid, branchID string) (*seata_proto.BranchStateResponse, error) {
 	if gc.client == nil {
 		return nil, fmt.Errorf("gRPC client not connected")
 	}
 
-	// This would use the actual generated client
-	// return gc.client.BranchFail(ctx, req)
+	req := &seata_proto.BranchStateRequest{
+		Gid:      gid,
+		BranchId: branchID,
+	}
 
-	// Placeholder implementation
-	return &BranchFailResponse{
-		Status: "success",
-	}, nil
+	return gc.client.BranchFail(ctx, req)
 }
 
 // Get retrieves a transaction via gRPC
-func (gc *GrpcClient) Get(ctx context.Context, req *GetRequest) (*GetResponse, error) {
+func (gc *GrpcClient) Get(ctx context.Context, gid string) (*TransactionInfo, error) {
 	if gc.client == nil {
 		return nil, fmt.Errorf("gRPC client not connected")
 	}
 
-	// This would use the actual generated client
-	// return gc.client.Get(ctx, req)
+	req := &seata_proto.GetRequest{
+		Gid: gid,
+	}
 
-	// Placeholder implementation
-	return &GetResponse{
-		Transaction: &GlobalTxn{
-			GID: req.GID,
-		},
-	}, nil
+	resp, err := gc.client.Get(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the JSON response
+	var txInfo TransactionInfo
+	if err := json.Unmarshal(resp.TxnJson, &txInfo); err != nil {
+		return nil, fmt.Errorf("failed to parse transaction JSON: %w", err)
+	}
+
+	return &txInfo, nil
 }
 
 // List retrieves transactions via gRPC
-func (gc *GrpcClient) List(ctx context.Context, req *ListRequest) (*ListResponse, error) {
+func (gc *GrpcClient) List(ctx context.Context, limit, offset int, status string) ([]*TransactionInfo, error) {
 	if gc.client == nil {
 		return nil, fmt.Errorf("gRPC client not connected")
 	}
 
-	// This would use the actual generated client
-	// return gc.client.List(ctx, req)
+	req := &seata_proto.ListRequest{
+		Limit:  uint32(limit),
+		Offset: uint32(offset),
+		Status: status,
+	}
 
-	// Placeholder implementation
-	return &ListResponse{
-		Transactions: []*GlobalTxn{},
-	}, nil
+	resp, err := gc.client.List(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the JSON responses
+	var transactions []*TransactionInfo
+	for _, txnJson := range resp.TxnJson {
+		var txInfo TransactionInfo
+		if err := json.Unmarshal(txnJson, &txInfo); err != nil {
+			return nil, fmt.Errorf("failed to parse transaction JSON: %w", err)
+		}
+		transactions = append(transactions, &txInfo)
+	}
+
+	return transactions, nil
 }

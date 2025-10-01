@@ -57,6 +57,55 @@ func main() {
 }
 ```
 
+### gRPC Usage
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "time"
+    "github.com/seata-team/seata-go-client"
+)
+
+func main() {
+    // Create client with gRPC configuration
+    config := &seata.Config{
+        HTTPEndpoint:    "http://localhost:36789",
+        GrpcEndpoint:    "localhost:36790",
+        RequestTimeout:  30 * time.Second,
+        MaxConnsPerHost: 100,
+    }
+
+    client := seata.NewClient(config)
+    defer client.Close()
+
+    // Start transaction (automatically uses gRPC if available)
+    ctx := context.Background()
+    payload := []byte(`{"order_id": "grpc-12345", "amount": 200.00}`)
+    
+    tx, err := client.StartTransaction(ctx, seata.ModeSaga, payload)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Add branches (automatically uses gRPC)
+    tx.AddBranch(ctx, "order-service", "http://order-service:8080/api/orders")
+    tx.AddBranch(ctx, "payment-service", "http://payment-service:8080/api/payments")
+
+    // Submit transaction (automatically uses gRPC)
+    err = tx.Submit(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+> Note
+- The server health endpoint returns plain text "ok"; the client maps this to a healthy status for convenience.
+- The server expects the transaction `payload` as a JSON array of integers. You can continue passing a Go `[]byte`; the client handles conversion automatically when sending requests.
+
 ### Saga Pattern
 
 ```go
@@ -215,6 +264,8 @@ if err != nil {
 fmt.Printf("Server status: %s\n", health.Status)
 ```
 
+> Note: The server responds with plain text `ok`; the client converts this into a structured `HealthStatus` with `Status = "healthy"`.
+
 ### Metrics
 
 ```go
@@ -258,11 +309,35 @@ go test -run TestClient
 
 ### Test Examples
 
+Note: Examples auto-start an ephemeral local mock HTTP server that returns 200 OK for branch endpoints. No fixed port is used.
+
 ```bash
-# Run example programs
-go run examples/basic_example.go
-go run examples/saga_example.go
-go run examples/tcc_example.go
+# Core examples
+go run examples/*.go basic
+go run examples/*.go saga
+go run examples/*.go tcc
+go run examples/*.go grpc
+go run examples/*.go comprehensive
+
+# Migrated examples (from seata-examples)
+go run examples/*.go mhttp_saga
+go run examples/*.go mgrpc_saga
+go run examples/*.go mgrpc_tcc
+go run examples/*.go mgrpc_headers
+go run examples/*.go mgrpc_msg
+go run examples/*.go mhttp_headers
+go run examples/*.go mhttp_msg
+go run examples/*.go mgrpc_saga_barrier
+go run examples/*.go mgrpc_saga_other
+go run examples/*.go mhttp_workflow_saga
+go run examples/*.go mhttp_workflow_tcc
+go run examples/*.go mhttp_xa
+go run examples/*.go mhttp_gorm_barrier
+go run examples/*.go mhttp_barrier_redis
+go run examples/*.go mhttp_saga_mongo
+go run examples/*.go mgrpc_workflow_saga
+go run examples/*.go mgrpc_workflow_tcc
+go run examples/*.go mgrpc_workflow_mixed
 ```
 
 ## 📚 API Reference
@@ -271,12 +346,16 @@ go run examples/tcc_example.go
 
 - `NewClient(config *Config) *Client` - Create new client
 - `NewClientWithDefaults() *Client` - Create client with defaults
-- `StartTransaction(ctx, mode, payload) (*Transaction, error)` - Start transaction
+- `StartTransaction(ctx, mode, payload) (*Transaction, error)` - Start transaction (auto-selects HTTP/gRPC)
 - `GetTransaction(ctx, gid) (*TransactionInfo, error)` - Get transaction
 - `ListTransactions(ctx, limit, offset, status) ([]*TransactionInfo, error)` - List transactions
 - `Health(ctx) (*HealthStatus, error)` - Health check
 - `Metrics(ctx) (string, error)` - Get metrics
 - `Close() error` - Close client
+
+### gRPC Support
+
+The client automatically detects and uses gRPC when available, falling back to HTTP otherwise. All transaction operations (start, add branch, submit) work seamlessly with both protocols.
 
 ### Transaction Methods
 
